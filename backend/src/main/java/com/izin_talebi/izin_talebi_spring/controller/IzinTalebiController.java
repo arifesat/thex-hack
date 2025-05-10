@@ -40,18 +40,13 @@ public class IzinTalebiController {
         return ResponseEntity.ok(created);
     }
 
-    // Tüm izin taleplerini listele (admin veya çalışan kendi taleplerini görebilir)
+    // Kullanıcının kendi izin taleplerini listele
     @GetMapping
-    @PreAuthorize("hasAnyRole('Çalışan','Admin')")
     public ResponseEntity<?> listIzinTalepleri(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
         
-        if ("Admin".equals(user.getRole())) {
-            return ResponseEntity.ok(izinTalebiService.getAllIzinTalepleri());
-        } else {
-            return ResponseEntity.ok(izinTalebiService.getIzinTalepleriByCalisanId(user.getCalisanId()));
-        }
+        return ResponseEntity.ok(izinTalebiService.getIzinTalepleriByCalisanId(user.getCalisanId()));
     }
 
     // İzin talebini onayla (sadece admin)
