@@ -13,12 +13,14 @@ import {
   CircularProgress,
   Alert,
   Chip,
+  Stack
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 import { toast } from 'react-toastify';
 import type { User } from '../types';
+import { Check as CheckIcon, Close as CloseIcon } from '@mui/icons-material';
 
 // Axios instance oluştur
 const api = axios.create({
@@ -111,32 +113,34 @@ const LeaveRequestList: React.FC = () => {
 
   const handleApprove = async (requestId: string) => {
     try {
-      await api.post(`/izin-talepleri/${requestId}/onayla`, {}, {
+      await api.put(`/izin-talepleri/${requestId}/onayla`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success('İzin talebi onaylandı');
+      toast.success('İzin talebi başarıyla onaylandı');
       setRequests(requests.map(req => 
         req.id === requestId 
           ? { ...req, requestStatus: 'ONAYLANDI' }
           : req
       ));
     } catch (error) {
+      console.error('Onaylama hatası:', error);
       toast.error('İzin talebi onaylanırken bir hata oluştu');
     }
   };
 
   const handleReject = async (requestId: string) => {
     try {
-      await api.post(`/izin-talepleri/${requestId}/reddet`, {}, {
+      await api.put(`/izin-talepleri/${requestId}/reddet`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      toast.success('İzin talebi reddedildi');
+      toast.success('İzin talebi başarıyla reddedildi');
       setRequests(requests.map(req => 
         req.id === requestId 
           ? { ...req, requestStatus: 'REDDEDİLDİ' }
           : req
       ));
     } catch (error) {
+      console.error('Reddetme hatası:', error);
       toast.error('İzin talebi reddedilirken bir hata oluştu');
     }
   };
@@ -218,13 +222,12 @@ const LeaveRequestList: React.FC = () => {
               <TableCell>İzin Tarihleri</TableCell>
               <TableCell>Durum</TableCell>
               <TableCell>Açıklama</TableCell>
-              {isHR && <TableCell>İşlemler</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {requests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isHR ? 6 : 4} align="center">
+                <TableCell colSpan={isHR ? 5 : 4} align="center">
                   Henüz izin talebi bulunmamaktadır.
                 </TableCell>
               </TableRow>
@@ -251,31 +254,6 @@ const LeaveRequestList: React.FC = () => {
                     />
                   </TableCell>
                   <TableCell>{request.requestDesc}</TableCell>
-                  {isHR && request.requestStatus === 'BEKLEMEDE' && (
-                    <TableCell>
-                      <Box display="flex" gap={1}>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="success"
-                          onClick={() => handleApprove(request.id)}
-                        >
-                          Onayla
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="error"
-                          onClick={() => handleReject(request.id)}
-                        >
-                          Reddet
-                        </Button>
-                      </Box>
-                    </TableCell>
-                  )}
-                  {isHR && request.requestStatus !== 'BEKLEMEDE' && (
-                    <TableCell>-</TableCell>
-                  )}
                 </TableRow>
               ))
             )}
