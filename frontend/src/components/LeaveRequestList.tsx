@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
+  Typography,
   Paper,
   Table,
   TableBody,
@@ -8,150 +9,173 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Typography,
   Button,
-  Chip,
-  Fab,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
 import { useNavigate } from 'react-router-dom';
-import type { LeaveRequest } from '../types';
-import { leaveRequestService } from '../services/api';
+import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
-import { toast } from 'react-toastify';
+
+// Axios instance oluştur
+const api = axios.create({
+  baseURL: 'http://localhost:8081/api',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+interface LeaveRequest {
+  id: string;
+  calisanId: string;
+  requestTime: string;
+  requestedDates: string | string[]; // string veya string[] olabilir
+  requestStatus: string;
+  requestDesc: string;
+}
 
 const LeaveRequestList: React.FC = () => {
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
-  const { user } = useAuth();
+  const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
-
-  const fetchLeaveRequests = async () => {
-    try {
-      const requests = await leaveRequestService.getLeaveRequests();
-      // If user is not admin, filter requests to show only their own
-      if (user?.role !== 'ADMIN') {
-        const userRequests = requests.filter(request => request.calisanId === user?.calisanId);
-        setLeaveRequests(userRequests);
-      } else {
-        setLeaveRequests(requests);
-      }
-    } catch (error) {
-      console.error('Error fetching leave requests:', error);
-      toast.error('İzin talepleri yüklenirken bir hata oluştu.');
-    }
-  };
+  const { token } = useAuth();
 
   useEffect(() => {
-    fetchLeaveRequests();
-  }, [user]);
+    const fetchRequests = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  const handleApprove = async (id: string) => {
+        // Token'ı header'a ekle
+        const config = {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        };
+
+        const response = await api.get('/izin-talepleri', config);
+        console.log('API Response:', response.data); // Debug için
+
+        if (Array.isArray(response.data)) {
+          // Veriyi düzenle
+          const formattedRequests = response.data.map(request => ({
+            ...request,
+            requestedDates: Array.isArray(request.requestedDates) 
+              ? request.requestedDates 
+              : [request.requestedDates] // Tek tarih ise diziye çevir
+          }));
+          setRequests(formattedRequests);
+        } else {
+          console.error('Unexpected API response format:', response.data);
+          setError('Sunucudan beklenmeyen yanıt formatı alındı.');
+        }
+      } catch (error) {
+        console.error('Error fetching leave requests:', error);
+        if (axios.isAxiosError(error)) {
+          if (error.code === 'ECONNABORTED') {
+            setError('Sunucuya bağlanırken zaman aşımı oluştu. Lütfen sayfayı yenileyin.');
+          } else if (error.response?.status === 401) {
+            setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+            setTimeout(() => navigate('/login'), 2000);
+          } else if (error.response?.status === 403) {
+            setError('Bu sayfaya erişim yetkiniz yok.');
+          } else {
+            setError(`İzin talepleri yüklenirken bir hata oluştu: ${error.response?.data?.message || error.message}`);
+          }
+        } else {
+          setError('Beklenmeyen bir hata oluştu. Lütfen sayfayı yenileyin.');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (token) {
+      fetchRequests();
+    } else {
+      setError('Oturum bilgisi bulunamadı. Lütfen tekrar giriş yapın.');
+      setTimeout(() => navigate('/login'), 2000);
+    }
+  }, [navigate, token]);
+
+  const formatDate = (dateString: string) => {
     try {
-      await leaveRequestService.approveLeaveRequest(id);
-      toast.success('İzin talebi onaylandı!');
-      fetchLeaveRequests();
+      return new Date(dateString).toLocaleDateString('tr-TR');
     } catch (error) {
-      toast.error('İzin talebi onaylanırken bir hata oluştu.');
+      console.error('Error formatting date:', dateString, error);
+      return dateString;
     }
   };
 
-  const handleReject = async (id: string) => {
-    try {
-      await leaveRequestService.rejectLeaveRequest(id);
-      toast.success('İzin talebi reddedildi!');
-      fetchLeaveRequests();
-    } catch (error) {
-      toast.error('İzin talebi reddedilirken bir hata oluştu.');
-    }
-  };
+  if (loading) {
+    return (
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+        <CircularProgress />
+      </Box>
+    );
+  }
 
-  const getStatusColor = (status: LeaveRequest['status']) => {
-    switch (status) {
-      case 'APPROVED':
-        return 'success';
-      case 'REJECTED':
-        return 'error';
-      default:
-        return 'warning';
-    }
-  };
-
-  const getStatusText = (status: LeaveRequest['status']) => {
-    switch (status) {
-      case 'APPROVED':
-        return 'Onaylandı';
-      case 'REJECTED':
-        return 'Reddedildi';
-      default:
-        return 'Beklemede';
-    }
-  };
+  if (error) {
+    return (
+      <Box mt={2}>
+        <Alert severity="error">{error}</Alert>
+        <Box mt={2} display="flex" justifyContent="center">
+          <Button variant="contained" onClick={() => window.location.reload()}>
+            Sayfayı Yenile
+          </Button>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ mt: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h5">
-          {user?.role === 'ADMIN' ? 'Tüm İzin Talepleri' : 'İzin Taleplerim'}
+    <Box>
+      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+        <Typography variant="h5" component="h2">
+          İzin Talepleri
         </Typography>
-        <Fab
+        <Button
+          variant="contained"
           color="primary"
-          aria-label="add"
           onClick={() => navigate('/new-request')}
-          size="small"
         >
-          <AddIcon />
-        </Fab>
+          Yeni İzin Talebi
+        </Button>
       </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
-              <TableCell>Başlangıç Tarihi</TableCell>
-              <TableCell>Bitiş Tarihi</TableCell>
-              <TableCell>Sebep</TableCell>
+              <TableCell>Talep Tarihi</TableCell>
+              <TableCell>İzin Tarihleri</TableCell>
               <TableCell>Durum</TableCell>
-              {user?.role === 'ADMIN' && <TableCell>İşlemler</TableCell>}
+              <TableCell>Açıklama</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {leaveRequests.length === 0 ? (
+            {requests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={user?.role === 'ADMIN' ? 5 : 4} align="center">
+                <TableCell colSpan={4} align="center">
                   Henüz izin talebi bulunmamaktadır.
                 </TableCell>
               </TableRow>
             ) : (
-              leaveRequests.map((request) => (
+              requests.map((request) => (
                 <TableRow key={request.id}>
-                  <TableCell>{new Date(request.startDate).toLocaleDateString()}</TableCell>
-                  <TableCell>{new Date(request.endDate).toLocaleDateString()}</TableCell>
-                  <TableCell>{request.reason}</TableCell>
+                  <TableCell>{formatDate(request.requestTime)}</TableCell>
                   <TableCell>
-                    <Chip
-                      label={getStatusText(request.status)}
-                      color={getStatusColor(request.status)}
-                      size="small"
-                    />
+                    {Array.isArray(request.requestedDates) 
+                      ? request.requestedDates.map(date => (
+                          <div key={date}>{formatDate(date)}</div>
+                        ))
+                      : formatDate(request.requestedDates as string)
+                    }
                   </TableCell>
-                  {user?.role === 'ADMIN' && request.status === 'PENDING' && (
-                    <TableCell>
-                      <Button
-                        size="small"
-                        color="success"
-                        onClick={() => handleApprove(request.id)}
-                        sx={{ mr: 1 }}
-                      >
-                        Onayla
-                      </Button>
-                      <Button
-                        size="small"
-                        color="error"
-                        onClick={() => handleReject(request.id)}
-                      >
-                        Reddet
-                      </Button>
-                    </TableCell>
-                  )}
+                  <TableCell>{request.requestStatus}</TableCell>
+                  <TableCell>{request.requestDesc}</TableCell>
                 </TableRow>
               ))
             )}

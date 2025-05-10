@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { Box, Button, TextField, Typography, Container, Paper } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 
 const validationSchema = yup.object({
@@ -17,8 +17,16 @@ const validationSchema = yup.object({
 });
 
 const Login: React.FC = () => {
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    }
+  }, [isAuthenticated, navigate, location]);
 
   const formik = useFormik({
     initialValues: {
@@ -26,13 +34,15 @@ const Login: React.FC = () => {
       password: '',
     },
     validationSchema: validationSchema,
-    onSubmit: async (values) => {
+    onSubmit: async (values, { setSubmitting }) => {
       try {
         await login(values.email, values.password);
         toast.success('Giriş başarılı!');
-        navigate('/dashboard');
       } catch (error) {
+        console.error('Login error:', error);
         toast.error('Giriş başarısız. Lütfen bilgilerinizi kontrol edin.');
+      } finally {
+        setSubmitting(false);
       }
     },
   });
@@ -65,6 +75,7 @@ const Login: React.FC = () => {
               onChange={formik.handleChange}
               error={formik.touched.email && Boolean(formik.errors.email)}
               helperText={formik.touched.email && formik.errors.email}
+              disabled={formik.isSubmitting}
             />
             <TextField
               margin="normal"
@@ -77,14 +88,16 @@ const Login: React.FC = () => {
               onChange={formik.handleChange}
               error={formik.touched.password && Boolean(formik.errors.password)}
               helperText={formik.touched.password && formik.errors.password}
+              disabled={formik.isSubmitting}
             />
             <Button
               type="submit"
               fullWidth
               variant="contained"
               sx={{ mt: 3, mb: 2 }}
+              disabled={formik.isSubmitting}
             >
-              Giriş Yap
+              {formik.isSubmitting ? 'Giriş Yapılıyor...' : 'Giriş Yap'}
             </Button>
           </Box>
         </Paper>

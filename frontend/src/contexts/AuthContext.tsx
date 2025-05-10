@@ -1,56 +1,99 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User, LoginResponse } from '../types';
-import { authService } from '../services/api';
+import axios from 'axios';
+
+interface User {
+  id: string;
+  email: string;
+  role: string;
+}
 
 interface AuthContextType {
   user: User | null;
   token: string | null;
+  isAuthenticated: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  isAuthenticated: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem('user');
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  
+  const [token, setToken] = useState<string | null>(() => {
+    return localStorage.getItem('token');
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return !!localStorage.getItem('token') && !!localStorage.getItem('user');
+  });
 
   useEffect(() => {
     if (token) {
-      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     } else {
-      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
     }
   }, [token]);
 
   const login = async (email: string, password: string) => {
     try {
-      const response = await authService.login({ email, password });
-      setToken(response.token);
-      setUser(response.user);
+      const response = await axios.post('http://localhost:8081/api/auth/login', {
+        email,
+        password,
+      });
+
+      const { token: newToken, user: userData } = response.data;
+      
+      // Önce state'i güncelle
+      setToken(newToken);
+      setUser(userData);
+      setIsAuthenticated(true);
+
+      // Sonra localStorage'a kaydet
+      localStorage.setItem('token', newToken);
+      localStorage.setItem('user', JSON.stringify(userData));
+
+      // Axios header'ını güncelle
+      axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     } catch (error) {
-      console.error('Login failed:', error);
+      console.error('Login error:', error);
       throw error;
     }
   };
 
   const logout = () => {
+    // Önce state'i temizle
     setToken(null);
     setUser(null);
+    setIsAuthenticated(false);
+
+    // Sonra localStorage'ı temizle
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+
+    // Axios header'ını temizle
+    delete axios.defaults.headers.common['Authorization'];
   };
 
-  return (
-    <AuthContext.Provider value={{ user, token, login, logout, isAuthenticated: !!token }}>
-      {children}
-    </AuthContext.Provider>
-  );
-};
+  const value = {
+    user,
+    token,
+    isAuthenticated,
+    login,
+    logout,
+  };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }; 

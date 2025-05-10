@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -22,7 +22,18 @@ const theme = createTheme({
 
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
+  const location = useLocation();
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  return <>{children}</>;
+};
+
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return !isAuthenticated ? <>{children}</> : <Navigate to="/dashboard" replace />;
 };
 
 const Navigation: React.FC = () => {
@@ -58,28 +69,26 @@ const App: React.FC = () => {
             <Navigation />
             <Container component="main" sx={{ mt: 4, mb: 4, flex: 1 }}>
               <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <PrivateRoute>
-                      <LeaveRequestList />
-                    </PrivateRoute>
-                  }
-                />
-                <Route
-                  path="/new-request"
-                  element={
-                    <PrivateRoute>
-                      <LeaveRequestForm />
-                    </PrivateRoute>
-                  }
-                />
+                <Route path="/login" element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                } />
+                <Route path="/dashboard" element={
+                  <PrivateRoute>
+                    <LeaveRequestList />
+                  </PrivateRoute>
+                } />
+                <Route path="/new-request" element={
+                  <PrivateRoute>
+                    <LeaveRequestForm />
+                  </PrivateRoute>
+                } />
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
               </Routes>
             </Container>
           </Box>
-          <ToastContainer position="bottom-right" />
+          <ToastContainer position="top-right" autoClose={3000} />
         </Router>
       </AuthProvider>
     </ThemeProvider>
