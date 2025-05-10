@@ -175,12 +175,18 @@ const LeaveRequestList: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     try {
+      // Eğer tarih DD.MM.YYYY formatındaysa
+      if (dateString.includes('.')) {
+        const [day, month, year] = dateString.split('.');
+        return `${day}.${month}.${year}`;
+      }
+      // Eğer tarih ISO formatındaysa
       const date = new Date(dateString);
       return date.toLocaleDateString('tr-TR', {
         year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
+        month: '2-digit',
+        day: '2-digit'
+      }).replace(/\./g, '.');
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
       return dateString;
@@ -188,15 +194,40 @@ const LeaveRequestList: React.FC = () => {
   };
 
   const formatDateRange = (dates: string | string[]) => {
-    if (Array.isArray(dates)) {
-      if (dates.length === 1) {
-        return formatDate(dates[0]);
+    try {
+      if (Array.isArray(dates)) {
+        if (dates.length === 1) {
+          // Tek tarih varsa
+          const date = dates[0];
+          if (date.includes('-')) {
+            // Eğer tarih aralığı formatındaysa (DD.MM.YYYY-DD.MM.YYYY)
+            const [startDate, endDate] = date.split('-');
+            return `${startDate} - ${endDate}`;
+          }
+          return formatDate(date);
+        }
+        // Birden fazla tarih varsa
+        const sortedDates = [...dates].sort((a, b) => {
+          if (a.includes('.') && b.includes('.')) {
+            const [dayA, monthA, yearA] = a.split('.');
+            const [dayB, monthB, yearB] = b.split('.');
+            return new Date(`${yearA}-${monthA}-${dayA}`).getTime() - new Date(`${yearB}-${monthB}-${dayB}`).getTime();
+          }
+          return new Date(a).getTime() - new Date(b).getTime();
+        });
+        return `${formatDate(sortedDates[0])} - ${formatDate(sortedDates[sortedDates.length - 1])}`;
       }
-      // Tarihleri sırala
-      const sortedDates = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-      return `${formatDate(sortedDates[0])} - ${formatDate(sortedDates[sortedDates.length - 1])}`;
+      // Tek bir string olarak gelen tarih
+      if (dates.includes('-')) {
+        // Eğer tarih aralığı formatındaysa (DD.MM.YYYY-DD.MM.YYYY)
+        const [startDate, endDate] = dates.split('-');
+        return `${startDate} - ${endDate}`;
+      }
+      return formatDate(dates);
+    } catch (error) {
+      console.error('Error formatting date range:', dates, error);
+      return dates.toString();
     }
-    return formatDate(dates);
   };
 
   const getStatusColor = (status: string) => {
