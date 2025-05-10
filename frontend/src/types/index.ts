@@ -1,14 +1,16 @@
 export interface User {
-  email: string;
+  id?: string;
+  calisanId: number;
   adSoyad: string;
   pozisyon: string;
-  calisanId: number;
+  email: string;
   role: string;
+  enabled?: boolean;
 }
 
 export interface LeaveRequest {
   id: string;
-  userId: string;
+  calisanId: number;
   startDate: string;
   endDate: string;
   reason: string;

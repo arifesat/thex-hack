@@ -30,12 +30,13 @@ const LeaveRequestList: React.FC = () => {
       const requests = await leaveRequestService.getLeaveRequests();
       // If user is not admin, filter requests to show only their own
       if (user?.role !== 'ADMIN') {
-        const userRequests = requests.filter(request => request.userId === user?.email);
+        const userRequests = requests.filter(request => request.calisanId === user?.calisanId);
         setLeaveRequests(userRequests);
       } else {
         setLeaveRequests(requests);
       }
     } catch (error) {
+      console.error('Error fetching leave requests:', error);
       toast.error('İzin talepleri yüklenirken bir hata oluştu.');
     }
   };

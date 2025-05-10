@@ -8,7 +8,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Collection;
-import java.util.Date;
 import java.util.List;
 
 @Data
@@ -22,18 +21,12 @@ public class User implements UserDetails {
     private Integer calisanId;
     private String adSoyad;
     private String pozisyon;
-    private Date iseBaslamaTarihi;
-    private Integer kullanilanIzinGun;
-    private Integer kalanIzinGun;
-    private Date talepOlusturmaTarihi;
-    private String talepEdilenIzinTarihleri;
-    private String talepDurumu;
-    private String talepAciklamasi;
+    private String role;
+    private String workStartDate;
+    private Integer usedDays;
+    private Integer remainingDays;
     private String email;
     private String password;
-    private String izinBaslangic;
-    private String izinBitis;
-    private String role = "USER";
     private boolean enabled = true;
 
     @Override
@@ -43,7 +36,7 @@ public class User implements UserDetails {
 
     @Override
     public String getUsername() {
-        return email; // Email'i username olarak kullan
+        return email;
     }
 
     @Override

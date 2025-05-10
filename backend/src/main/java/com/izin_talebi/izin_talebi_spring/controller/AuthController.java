@@ -11,10 +11,15 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
+    private static final Logger logger = LoggerFactory.getLogger(AuthController.class);
 
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
@@ -31,27 +36,55 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody @Valid AuthRequest authRequest) {
         try {
+            logger.debug("Login attempt for email: {}", authRequest.getEmail());
+            logger.debug("Attempting to authenticate with password length: {}", authRequest.getPassword() != null ? authRequest.getPassword().length() : 0);
+            
+            // Kullanıcıyı veritabanından al ve kontrol et
+            User user = userService.findByEmail(authRequest.getEmail())
+                    .orElseThrow(() -> {
+                        logger.error("User not found for email: {}", authRequest.getEmail());
+                        return new RuntimeException("Kullanıcı bulunamadı");
+                    });
+            
+            logger.debug("User found in database: {}", user.getAdSoyad());
+            logger.debug("User role: {}", user.getRole());
+            logger.debug("User enabled status: {}", user.isEnabled());
+
+            // Authentication denemesi
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(authRequest.getEmail(), authRequest.getPassword())
             );
+            
+            logger.debug("Authentication successful for user: {}", user.getEmail());
 
-            // Kullanıcıyı veritabanından al
-            User user = userService.findByEmail(authRequest.getEmail())
-                    .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
-
-            // UserDetails nesnesini doğru şekilde oluştur
+            // UserDetails nesnesini oluştur
             UserDetails userDetails = org.springframework.security.core.userdetails.User
                     .withUsername(user.getEmail())
                     .password(user.getPassword())
-                    .roles(user.getRole()) // Eğer role bir String ise, bu şekilde kullanın
-                    // .authorities(...) // Eğer GrantedAuthority listesi kullanıyorsanız
+                    .roles(user.getRole())
                     .build();
 
             // Token oluştur
             String token = jwtUtil.generateToken(userDetails);
-            return ResponseEntity.ok(new AuthResponse(token));
+            logger.debug("Token generated successfully for user: {}", user.getEmail());
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", token);
+            response.put("user", user);
+            
+            return ResponseEntity.ok(response);
         } catch (AuthenticationException e) {
-            return ResponseEntity.status(401).body("E-posta veya şifre hatalı");
+            logger.error("Authentication failed for email: {}", authRequest.getEmail(), e);
+            logger.error("Authentication error details: {}", e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "E-posta veya şifre hatalı");
+            return ResponseEntity.status(401).body(error);
+        } catch (Exception e) {
+            logger.error("Unexpected error during login", e);
+            logger.error("Error details: {}", e.getMessage());
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Giriş işlemi sırasında bir hata oluştu");
+            return ResponseEntity.status(500).body(error);
         }
     }
 
@@ -86,8 +119,10 @@ public class AuthController {
     public ResponseEntity<?> testDatabase() {
         try {
             long userCount = userService.findAll().spliterator().getExactSizeIfKnown();
+            logger.debug("Database connection successful. Total user count: {}", userCount);
             return ResponseEntity.ok("Veritabanı bağlantısı başarılı. Toplam kullanıcı sayısı: " + userCount);
         } catch (Exception e) {
+            logger.error("Database connection error", e);
             return ResponseEntity.status(500).body("Veritabanı bağlantı hatası: " + e.getMessage());
         }
     }
