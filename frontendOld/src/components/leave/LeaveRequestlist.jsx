@@ -34,11 +34,19 @@ const LeaveRequestList = () => {
     try {
       setLoading(true);
       setError('');
-      const data = await leaveService.getLeaveRequests();
-      setRequests(data);
+      const response = await leaveService.getLeaveRequests();
+      console.log('İzin talepleri yanıtı:', response); // Debug için
+      if (Array.isArray(response)) {
+        setRequests(response);
+      } else if (response && Array.isArray(response.data)) {
+        setRequests(response.data);
+      } else {
+        console.error('Beklenmeyen yanıt formatı:', response);
+        setError('Sunucudan beklenmeyen bir yanıt alındı.');
+      }
     } catch (error) {
-      setError('İzin talepleri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
-      console.error('İzin talepleri yüklenirken hata:', error);
+      console.error('İzin talepleri yüklenirken hata:', error.response || error);
+      setError(error.response?.data?.message || 'İzin talepleri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     } finally {
       setLoading(false);
     }
@@ -111,7 +119,7 @@ const LeaveRequestList = () => {
                 <TableRow>
                   <TableCell>Başlangıç Tarihi</TableCell>
                   <TableCell>Bitiş Tarihi</TableCell>
-                  <TableCell>Neden</TableCell>
+                  <TableCell>Açıklama</TableCell>
                   <TableCell>Durum</TableCell>
                 </TableRow>
               </TableHead>
@@ -124,7 +132,7 @@ const LeaveRequestList = () => {
                     <TableCell>
                       {format(new Date(request.endDate), 'dd MMMM yyyy', { locale: tr })}
                     </TableCell>
-                    <TableCell>{request.reason}</TableCell>
+                    <TableCell>{request.description}</TableCell>
                     <TableCell>
                       <Chip
                         label={getStatusText(request.status)}

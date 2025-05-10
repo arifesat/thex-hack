@@ -19,27 +19,28 @@ public class DataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
         // Veritabanındaki tüm kullanıcıları listele
-        System.out.println("Veritabanındaki çalışanlar:");
-        userRepository.findAll().forEach(user -> {
-            System.out.println("ID: " + user.getId());
-            System.out.println("Çalışan ID: " + user.getCalisanId());
-            System.out.println("Ad Soyad: " + user.getAdSoyad());
-            System.out.println("E-posta: " + user.getEmail());
-            System.out.println("Pozisyon: " + user.getPozisyon());
-            System.out.println("Rol: " + user.getRole());
-            System.out.println("------------------------");
-        });
+//        System.out.println("Veritabanındaki çalışanlar:");
+//        userRepository.findAll().forEach(user -> {
+//            System.out.println("ID: " + user.getId());
+//            System.out.println("Çalışan ID: " + user.getCalisanId());
+//            System.out.println("Ad Soyad: " + user.getAdSoyad());
+//            System.out.println("E-posta: " + user.getEmail());
+//            System.out.println("Pozisyon: " + user.getPozisyon());
+//            System.out.println("Rol: " + user.getRole());
+//            System.out.println("------------------------");
+//        });
 
         // Mevcut kullanıcıları güncelle
         userRepository.findAll().forEach(user -> {
             // Eğer kullanıcının rolü yoksa varsayılan olarak USER rolü ata
             if (user.getRole() == null || user.getRole().isEmpty()) {
-                user.setRole("USER");
-            }
+                user.setRole("Çalışan");
+
             
-            // Kullanıcıyı güncelle
-            userRepository.save(user);
-            System.out.println("Kullanıcı güncellendi: " + user.getEmail());
+                // Kullanıcıyı güncelle
+                userRepository.save(user);
+                System.out.println("Kullanıcı güncellendi: " + user.getEmail());
+            }
         });
     }
 } 

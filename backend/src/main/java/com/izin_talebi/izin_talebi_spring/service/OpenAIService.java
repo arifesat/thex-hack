@@ -13,7 +13,7 @@ import java.nio.file.Paths;
 public class OpenAIService {
 
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
-    private static final String API_KEY_PATH = "openai_api_key.txt";
+    private static final String API_KEY_PATH = "src/main/java/com/izin_talebi/izin_talebi_spring/service/openai_api_key.txt";
     private String openaiApiKey;
 
     public OpenAIService() {

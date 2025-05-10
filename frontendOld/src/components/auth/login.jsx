@@ -15,7 +15,7 @@ const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
   const [formData, setFormData] = useState({
-    username: '',
+    email: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -35,10 +35,10 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await login(formData.username, formData.password);
+      await login(formData.email, formData.password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Giriş yapılırken bir hata oluştu');
     } finally {
       setLoading(false);
     }
@@ -73,12 +73,12 @@ const Login = () => {
               margin="normal"
               required
               fullWidth
-              id="username"
-              label="Kullanıcı Adı"
-              name="username"
-              autoComplete="username"
+              id="email"
+              label="E-posta"
+              name="email"
+              autoComplete="email"
               autoFocus
-              value={formData.username}
+              value={formData.email}
               onChange={handleChange}
             />
             <TextField
@@ -109,10 +109,10 @@ const Login = () => {
               Test Kullanıcıları:
             </Typography>
             <Typography variant="body2" color="text.secondary" align="center">
-              Admin: admin / admin123
+              Admin: admin@example.com / admin123
             </Typography>
             <Typography variant="body2" color="text.secondary" align="center">
-              Kullanıcı: user / user123
+              Kullanıcı: user@example.com / user123
             </Typography>
           </Box>
         </Paper>

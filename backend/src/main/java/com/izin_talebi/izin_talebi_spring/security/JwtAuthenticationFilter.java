@@ -11,12 +11,15 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    private static final Logger logger = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService userDetailsService;
 
@@ -30,31 +33,43 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
         
-        final String authHeader = request.getHeader("Authorization");
-        final String jwt;
-        final String userEmail;
+        try {
+            final String authHeader = request.getHeader("Authorization");
+            logger.debug("Auth header: {}", authHeader);
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                logger.debug("No valid Authorization header found");
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            final String jwt = authHeader.substring(7);
+            final String userEmail = jwtUtil.extractUsername(jwt);
+            logger.debug("Extracted user email: {}", userEmail);
+
+            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
+                logger.debug("Loaded user details: {}", userDetails.getUsername());
+                
+                if (jwtUtil.validateToken(jwt, userDetails)) {
+                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
+                    );
+                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                    logger.debug("Authentication successful for user: {}", userEmail);
+                } else {
+                    logger.warn("Token validation failed for user: {}", userEmail);
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error processing JWT token", e);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return;
         }
-
-        jwt = authHeader.substring(7);
-        userEmail = jwtUtil.extractUsername(jwt);
-
-        if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail);
-            
-            if (jwtUtil.validateToken(jwt, userDetails)) {
-                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                    userDetails,
-                    null,
-                    userDetails.getAuthorities()
-                );
-                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authToken);
-            }
-        }
+        
         filterChain.doFilter(request, response);
     }
 } 

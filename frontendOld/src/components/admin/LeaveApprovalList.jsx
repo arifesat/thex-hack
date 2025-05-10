@@ -40,7 +40,7 @@ const LeaveApprovalList = () => {
     try {
       setLoading(true);
       setError('');
-      const data = await leaveService.getLeaveRequestsForApproval();
+      const data = await leaveService.getLeaveRequests();
       setRequests(data);
     } catch (error) {
       setError('İzin talepleri yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
@@ -52,7 +52,7 @@ const LeaveApprovalList = () => {
 
   const handleApprove = async (requestId) => {
     try {
-      await leaveService.updateLeaveRequestStatus(requestId, 'APPROVED');
+      await leaveService.approveLeaveRequest(requestId);
       await fetchRequests();
     } catch (error) {
       setError('İzin talebi onaylanırken bir hata oluştu.');
@@ -64,9 +64,7 @@ const LeaveApprovalList = () => {
     if (!selectedRequest) return;
 
     try {
-      await leaveService.updateLeaveRequestStatus(selectedRequest.id, 'REJECTED', {
-        rejectionReason
-      });
+      await leaveService.rejectLeaveRequest(selectedRequest.id);
       setDialogOpen(false);
       setRejectionReason('');
       setSelectedRequest(null);
@@ -149,7 +147,7 @@ const LeaveApprovalList = () => {
               <TableBody>
                 {requests.map((request) => (
                   <TableRow key={request.id}>
-                    <TableCell>{request.employeeName}</TableCell>
+                    <TableCell>{request.user?.adSoyad || 'Bilinmiyor'}</TableCell>
                     <TableCell>
                       {format(new Date(request.startDate), 'dd MMMM yyyy', { locale: tr })}
                     </TableCell>

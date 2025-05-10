@@ -3,24 +3,6 @@ import axios from '../utils/axios.config';
 
 const AuthContext = createContext(null);
 
-// Test kullanıcıları
-const MOCK_USERS = [
-  {
-    id: 1,
-    username: 'admin',
-    password: 'admin123',
-    role: 'ADMIN',
-    name: 'Admin User'
-  },
-  {
-    id: 2,
-    username: 'user',
-    password: 'user123',
-    role: 'USER',
-    name: 'Normal User'
-  }
-];
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,12 +13,9 @@ export const AuthProvider = ({ children }) => {
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
           const userData = JSON.parse(storedUser);
-          // Token'ın geçerliliğini kontrol et
-          const response = await axios.get('/auth/me');
-          setUser(response.data);
+          setUser(userData);
         }
       } catch (error) {
-        // Token geçersizse kullanıcıyı çıkış yaptır
         localStorage.removeItem('user');
         setUser(null);
       } finally {
@@ -47,30 +26,45 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const login = async (username, password) => {
+  const login = async (email, password) => {
     try {
-      const response = await axios.post('/auth/login', { username, password });
-      const userData = response.data;
+      const response = await axios.post('/api/auth/login', { email, password });
+      console.log('Login response:', response.data); // Debug için
+      
+      const { token } = response.data;
+      if (!token) {
+        throw new Error('Token alınamadı');
+      }
+
+      // Token'ı localStorage'a kaydet
+      localStorage.setItem('token', token);
+      
+      // Kullanıcı bilgilerini al
+      const userResponse = await axios.get(`/api/auth/debug/user/${email}`);
+      console.log('User response:', userResponse.data); // Debug için
+      
+      const userData = { 
+        ...userResponse.data, 
+        token,
+        email
+      };
+      
       setUser(userData);
       localStorage.setItem('user', JSON.stringify(userData));
       return userData;
     } catch (error) {
+      console.error('Login error:', error.response || error); // Debug için
       if (error.response?.status === 401) {
-        throw new Error('Geçersiz kullanıcı adı veya şifre');
+        throw new Error('Geçersiz e-posta veya şifre');
       }
       throw new Error('Giriş yapılırken bir hata oluştu. Lütfen daha sonra tekrar deneyin.');
     }
   };
 
-  const logout = async () => {
-    try {
-      await axios.post('/auth/logout');
-    } catch (error) {
-      console.error('Çıkış yapılırken hata:', error);
-    } finally {
-      setUser(null);
-      localStorage.removeItem('user');
-    }
+  const logout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
   };
 
   const value = {
