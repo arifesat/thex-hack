@@ -5,13 +5,24 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.http.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 @Service
 public class OpenAIService {
 
-    // OpenAI API anahtarınızı buraya ekleyin
-    private static final String OPENAI_API_KEY = "YOUR_OPENAI_API_KEY";
     private static final String OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+    private static final String API_KEY_PATH = "openai_api_key.txt";
+    private String openaiApiKey;
+
+    public OpenAIService() {
+        try {
+            openaiApiKey = Files.readString(Paths.get(API_KEY_PATH)).trim();
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read OpenAI API key from file", e);
+        }
+    }
 
     public String analyzeText(String text) {
         // Basit bir örnek: OpenAI Chat API'ye POST isteği atar
@@ -19,7 +30,7 @@ public class OpenAIService {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(OPENAI_API_KEY);
+        headers.setBearerAuth(openaiApiKey);
 
         Map<String, Object> message = new HashMap<>();
         message.put("role", "user");
