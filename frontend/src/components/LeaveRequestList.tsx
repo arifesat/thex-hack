@@ -24,21 +24,31 @@ import { Check as CheckIcon, Close as CloseIcon } from '@mui/icons-material';
 
 // Axios instance oluştur
 const api = axios.create({
-  baseURL: 'http://localhost:8081/api',
+  baseURL: 'http://localhost:8080/api',
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+// Axios interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.code === 'ERR_NETWORK') {
+      console.error('Backend servisine bağlanılamıyor. Lütfen backend servisinin çalıştığından emin olun.');
+    }
+    return Promise.reject(error);
+  }
+);
+
 interface LeaveRequest {
   id: string;
   calisanId: number;
-  requestTime: string;
-  requestedDates: string | string[];
+  requestedDates: string[];
   requestStatus: string;
-  requestDesc: string;
-  employeeName?: string;
+  remainingDays?: number;
+  adSoyad?: string;
 }
 
 const LeaveRequestList: React.FC = () => {
@@ -54,36 +64,59 @@ const LeaveRequestList: React.FC = () => {
       try {
         setLoading(true);
         setError(null);
-
-        const config = {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        };
-
-        const response = await api.get('/izin-talepleri', config);
-        console.log('API Response:', response.data);
-
-        if (Array.isArray(response.data)) {
-          const formattedRequests = response.data.map(request => ({
-            ...request,
-            requestedDates: Array.isArray(request.requestedDates) 
-              ? request.requestedDates 
-              : [request.requestedDates]
-          }));
-
-          // İK Uzmanı değilse sadece kendi taleplerini göster
-          const filteredRequests = isHR 
-            ? formattedRequests 
-            : formattedRequests.filter(request => request.calisanId === (user as User)?.calisanId);
-
-          setRequests(filteredRequests);
-        } else {
-          console.error('Unexpected API response format:', response.data);
-          setError('Sunucudan beklenmeyen yanıt formatı alındı.');
+        const token = localStorage.getItem('token');
+        if (!token) {
+          throw new Error('Token bulunamadı');
         }
+
+        // İzin taleplerini getir
+        const response = await api.get('/izin-talepleri', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+
+        if (!response.data) {
+          throw new Error('İzin talepleri alınamadı');
+        }
+
+        let requests = response.data;
+        
+        // Her bir istek için kullanıcı bilgilerini al
+        let processedRequests = await Promise.all(
+          requests.map(async (request: LeaveRequest) => {
+            try {
+              const userResponse = await api.get(`/users/${request.calisanId}`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              });
+
+              if (userResponse.data) {
+                return {
+                  ...request,
+                  remainingDays: userResponse.data.remainingDays,
+                  adSoyad: userResponse.data.adSoyad
+                };
+              }
+              return request;
+            } catch (error) {
+              console.error('Kullanıcı bilgileri alınamadı:', error);
+              return request;
+            }
+          })
+        );
+
+        // İK Uzmanı değilse sadece kendi taleplerini göster
+        if (user?.pozisyon !== 'İK Uzmanı') {
+          processedRequests = processedRequests.filter(
+            (request) => request.calisanId === user?.calisanId
+          );
+        }
+
+        setRequests(processedRequests);
       } catch (error) {
-        console.error('Error fetching leave requests:', error);
+        console.error('Hata:', error);
         if (axios.isAxiosError(error)) {
           if (error.code === 'ECONNABORTED') {
             setError('Sunucuya bağlanırken zaman aşımı oluştu. Lütfen sayfayı yenileyin.');
@@ -103,13 +136,8 @@ const LeaveRequestList: React.FC = () => {
       }
     };
 
-    if (token) {
-      fetchRequests();
-    } else {
-      setError('Oturum bilgisi bulunamadı. Lütfen tekrar giriş yapın.');
-      setTimeout(() => navigate('/login'), 2000);
-    }
-  }, [navigate, token, user, isHR]);
+    fetchRequests();
+  }, [user, navigate]);
 
   const handleApprove = async (requestId: string) => {
     try {
@@ -147,11 +175,28 @@ const LeaveRequestList: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     try {
-      return new Date(dateString).toLocaleDateString('tr-TR');
+      const date = new Date(dateString);
+      return date.toLocaleDateString('tr-TR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
     } catch (error) {
       console.error('Error formatting date:', dateString, error);
       return dateString;
     }
+  };
+
+  const formatDateRange = (dates: string | string[]) => {
+    if (Array.isArray(dates)) {
+      if (dates.length === 1) {
+        return formatDate(dates[0]);
+      }
+      // Tarihleri sırala
+      const sortedDates = [...dates].sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      return `${formatDate(sortedDates[0])} - ${formatDate(sortedDates[sortedDates.length - 1])}`;
+    }
+    return formatDate(dates);
   };
 
   const getStatusColor = (status: string) => {
@@ -165,6 +210,12 @@ const LeaveRequestList: React.FC = () => {
       default:
         return 'default';
     }
+  };
+
+  const getRemainingDaysColor = (days: number) => {
+    if (days <= 0) return 'error';
+    if (days <= 5) return 'warning';
+    return 'success';
   };
 
   if (loading) {
@@ -218,16 +269,16 @@ const LeaveRequestList: React.FC = () => {
           <TableHead>
             <TableRow>
               {isHR && <TableCell>Çalışan</TableCell>}
-              <TableCell>Talep Tarihi</TableCell>
               <TableCell>İzin Tarihleri</TableCell>
+              <TableCell>Kalan İzin Günü</TableCell>
               <TableCell>Durum</TableCell>
-              <TableCell>Açıklama</TableCell>
+              {isHR && <TableCell>İşlem</TableCell>}
             </TableRow>
           </TableHead>
           <TableBody>
             {requests.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={isHR ? 5 : 4} align="center">
+                <TableCell colSpan={isHR ? 6 : 5} align="center">
                   Henüz izin talebi bulunmamaktadır.
                 </TableCell>
               </TableRow>
@@ -235,16 +286,17 @@ const LeaveRequestList: React.FC = () => {
               requests.map((request) => (
                 <TableRow key={request.id}>
                   {isHR && (
-                    <TableCell>{request.employeeName || `Çalışan ID: ${request.calisanId}`}</TableCell>
+                    <TableCell>{request.adSoyad || `Çalışan ID: ${request.calisanId}`}</TableCell>
                   )}
-                  <TableCell>{formatDate(request.requestTime)}</TableCell>
                   <TableCell>
-                    {Array.isArray(request.requestedDates) 
-                      ? request.requestedDates.map(date => (
-                          <div key={date}>{formatDate(date)}</div>
-                        ))
-                      : formatDate(request.requestedDates as string)
-                    }
+                    {formatDateRange(request.requestedDates)}
+                  </TableCell>
+                  <TableCell>
+                    <Chip 
+                      label={`${request.remainingDays || 0} gün`}
+                      color={getRemainingDaysColor(request.remainingDays || 0)}
+                      size="small"
+                    />
                   </TableCell>
                   <TableCell>
                     <Chip 
@@ -253,7 +305,32 @@ const LeaveRequestList: React.FC = () => {
                       size="small"
                     />
                   </TableCell>
-                  <TableCell>{request.requestDesc}</TableCell>
+                  {isHR && (
+                    <TableCell>
+                      {request.requestStatus === 'BEKLEMEDE' && (
+                        <Stack direction="row" spacing={1}>
+                          <Button
+                            variant="contained"
+                            color="success"
+                            size="small"
+                            onClick={() => handleApprove(request.id)}
+                            startIcon={<CheckIcon />}
+                          >
+                            Onayla
+                          </Button>
+                          <Button
+                            variant="contained"
+                            color="error"
+                            size="small"
+                            onClick={() => handleReject(request.id)}
+                            startIcon={<CloseIcon />}
+                          >
+                            Reddet
+                          </Button>
+                        </Stack>
+                      )}
+                    </TableCell>
+                  )}
                 </TableRow>
               ))
             )}
