@@ -1,11 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-
-interface User {
-  id: string;
-  email: string;
-  role: string;
-}
+import type { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
@@ -56,16 +51,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const { token: newToken, user: userData } = response.data;
       
-      // Önce state'i güncelle
       setToken(newToken);
       setUser(userData);
       setIsAuthenticated(true);
 
-      // Sonra localStorage'a kaydet
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(userData));
 
-      // Axios header'ını güncelle
       axios.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
     } catch (error) {
       console.error('Login error:', error);
@@ -74,16 +66,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
-    // Önce state'i temizle
     setToken(null);
     setUser(null);
     setIsAuthenticated(false);
 
-    // Sonra localStorage'ı temizle
     localStorage.removeItem('token');
     localStorage.removeItem('user');
 
-    // Axios header'ını temizle
     delete axios.defaults.headers.common['Authorization'];
   };
 

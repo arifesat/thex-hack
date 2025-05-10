@@ -29,7 +29,6 @@ public class IzinTalebiController {
 
     // İzin talebi oluştur
     @PostMapping
-    @PreAuthorize("hasRole('Çalışan')")
     public ResponseEntity<?> createIzinTalebi(@RequestBody @Valid IzinTalebi izinTalebi,
                                             @AuthenticationPrincipal UserDetails userDetails) {
         User user = userService.findByEmail(userDetails.getUsername())
@@ -40,28 +39,48 @@ public class IzinTalebiController {
         return ResponseEntity.ok(created);
     }
 
-    // Kullanıcının kendi izin taleplerini listele
+    // İzin taleplerini listele
     @GetMapping
     public ResponseEntity<?> listIzinTalepleri(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userService.findByEmail(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
         
+        // İK Uzmanı ise tüm talepleri getir
+        if ("İK Uzmanı".equals(user.getPozisyon())) {
+            return ResponseEntity.ok(izinTalebiService.getAllIzinTalepleri());
+        }
+        
+        // Normal çalışan ise sadece kendi taleplerini getir
         return ResponseEntity.ok(izinTalebiService.getIzinTalepleriByCalisanId(user.getCalisanId()));
     }
 
-    // İzin talebini onayla (sadece admin)
+    // İzin talebini onayla
     @PutMapping("/{id}/onayla")
-    @PreAuthorize("hasRole('Admin')")
-    public ResponseEntity<?> approveIzinTalebi(@PathVariable String id) {
+    public ResponseEntity<?> approveIzinTalebi(@PathVariable String id,
+                                             @AuthenticationPrincipal UserDetails userDetails) {
+        User user = userService.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+        
+        if (!"İK Uzmanı".equals(user.getPozisyon())) {
+            return ResponseEntity.status(403).body("Bu işlem için yetkiniz bulunmamaktadır.");
+        }
+        
         return izinTalebiService.approveIzinTalebi(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    // İzin talebini reddet (sadece admin)
+    // İzin talebini reddet
     @PutMapping("/{id}/reddet")
-    @PreAuthorize("hasRole('Admin')")
-    public ResponseEntity<?> rejectIzinTalebi(@PathVariable String id) {
+    public ResponseEntity<?> rejectIzinTalebi(@PathVariable String id,
+                                            @AuthenticationPrincipal UserDetails userDetails) {
+        User user = userService.findByEmail(userDetails.getUsername())
+                .orElseThrow(() -> new RuntimeException("Kullanıcı bulunamadı"));
+        
+        if (!"İK Uzmanı".equals(user.getPozisyon())) {
+            return ResponseEntity.status(403).body("Bu işlem için yetkiniz bulunmamaktadır.");
+        }
+        
         return izinTalebiService.rejectIzinTalebi(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());

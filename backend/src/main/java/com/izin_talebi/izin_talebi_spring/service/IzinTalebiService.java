@@ -26,7 +26,7 @@ public class IzinTalebiService {
     // İzin talebi oluştur
     @Transactional
     public IzinTalebi createIzinTalebi(IzinTalebi izinTalebi) {
-        izinTalebi.setRequestStatus("Bekliyor");
+        izinTalebi.setRequestStatus("BEKLEMEDE");
         return izinTalebiRepository.save(izinTalebi);
     }
 
@@ -50,7 +50,7 @@ public class IzinTalebiService {
     public Optional<IzinTalebi> approveIzinTalebi(String id) {
         Optional<IzinTalebi> izinTalebiOpt = izinTalebiRepository.findById(id);
         izinTalebiOpt.ifPresent(iz -> {
-            iz.setRequestStatus("Onaylandı");
+            iz.setRequestStatus("ONAYLANDI");
             izinTalebiRepository.save(iz);
             
             // Çalışanın kalan izin günlerini güncelle
@@ -73,7 +73,7 @@ public class IzinTalebiService {
     public Optional<IzinTalebi> rejectIzinTalebi(String id) {
         Optional<IzinTalebi> izinTalebiOpt = izinTalebiRepository.findById(id);
         izinTalebiOpt.ifPresent(iz -> {
-            iz.setRequestStatus("Reddedildi");
+            iz.setRequestStatus("REDDEDİLDİ");
             izinTalebiRepository.save(iz);
         });
         return izinTalebiOpt;
