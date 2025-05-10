@@ -1,0 +1,22 @@
+server:
+  port: 8080
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/izin_takip_sistemi
+  security:
+    jwt:
+      secret: RFk12UF8VCGoLjeRls1GGjc81inhOICSvFBm1I5fO+c=
+      expiration: 86400000 # 24 hours
+
+openai:
+  api:
+    key: ${OPENAI_API_KEY:your-openai-api-key-here}
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method 
